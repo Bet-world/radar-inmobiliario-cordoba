@@ -7,94 +7,451 @@
 <meta name="viewport" content="width=device-width, initial-scale=1" />
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
 <style>
-  html, body { height: 100%; margin: 0; font-family: -apple-system, Helvetica, Arial, sans-serif; }
-  #mapa { height: 100%; width: 100%; }
-  .leyenda {
-    position: absolute; bottom: 20px; left: 10px; z-index: 1000;
-    background: white; padding: 10px 14px; border-radius: 8px;
-    box-shadow: 0 1px 5px rgba(0,0,0,0.4); font-size: 13px; line-height: 1.6;
+  :root {
+    color-scheme: light;
+    --surface-1: #fcfcfb;
+    --page: #f9f9f7;
+    --text-primary: #0b0b0b;
+    --text-secondary: #52514e;
+    --text-muted: #898781;
+    --gridline: #e1e0d9;
+    --baseline: #c3c2b7;
+    --border: rgba(11,11,11,0.10);
+    --series-1: #2a78d6;
   }
-  .leyenda .item { display: flex; align-items: center; gap: 6px; }
-  .leyenda .punto { width: 12px; height: 12px; border-radius: 50%; display: inline-block; }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      color-scheme: dark;
+      --surface-1: #1a1a19;
+      --page: #0d0d0d;
+      --text-primary: #ffffff;
+      --text-secondary: #c3c2b7;
+      --text-muted: #898781;
+      --gridline: #2c2c2a;
+      --baseline: #383835;
+      --border: rgba(255,255,255,0.10);
+      --series-1: #3987e5;
+    }
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; background: var(--page); color: var(--text-primary);
+    font-family: system-ui, -apple-system, "Segoe UI", sans-serif; }
+  body { padding: 16px; display: flex; flex-direction: column; gap: 16px; }
+
+  header h1 { font-size: 20px; margin: 0 0 2px; }
+  header p { margin: 0; color: var(--text-secondary); font-size: 13px; }
+
+  .stats { display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: 12px; }
+  .stat-tile { background: var(--surface-1); border: 1px solid var(--border); border-radius: 10px;
+    padding: 14px 16px; }
+  .stat-tile .label { color: var(--text-secondary); font-size: 12px; margin-bottom: 4px; }
+  .stat-tile .value { font-size: 26px; font-weight: 600; }
+
+  .filtros { background: var(--surface-1); border: 1px solid var(--border); border-radius: 10px;
+    padding: 12px 16px; display: flex; flex-wrap: wrap; align-items: center; gap: 20px; font-size: 13px; }
+  .filtros .grupo { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+  .filtros .grupo strong { color: var(--text-secondary); font-weight: 600; font-size: 12px; }
+  .filtros label { display: flex; align-items: center; gap: 4px; cursor: pointer; }
+  .filtros input[type="number"] { width: 90px; padding: 4px 6px; border: 1px solid var(--baseline);
+    border-radius: 6px; background: var(--surface-1); color: var(--text-primary); font-size: 13px; }
+  .filtros .swatch { width: 10px; height: 10px; border-radius: 2px; display: inline-block; }
+  .filtros button { margin-left: auto; border: 1px solid var(--baseline); background: transparent;
+    color: var(--text-secondary); border-radius: 6px; padding: 5px 10px; cursor: pointer; font-size: 12px; }
+
+  .grid-principal { display: grid; grid-template-columns: 1.3fr 1fr; gap: 16px; align-items: start; }
+  @media (max-width: 900px) { .grid-principal { grid-template-columns: 1fr; } }
+
+  #mapa { height: 420px; border-radius: 10px; overflow: hidden; border: 1px solid var(--border); }
+
+  .panel { background: var(--surface-1); border: 1px solid var(--border); border-radius: 10px; padding: 14px 16px; }
+  .panel h2 { font-size: 14px; margin: 0 0 12px; }
+  .panel .subtitulo { color: var(--text-muted); font-size: 11px; margin: -8px 0 12px; }
+
+  .barra-fila { display: flex; align-items: center; gap: 8px; margin-bottom: 6px; font-size: 12px; }
+  .barra-fila .nombre { width: 130px; flex-shrink: 0; color: var(--text-secondary);
+    white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .barra-fila .pista { flex: 1; position: relative; height: 18px; }
+  .barra-fila .barra { position: absolute; left: 0; top: 1px; height: 16px; border-radius: 4px;
+    min-width: 2px; cursor: default; }
+  .barra-fila .valor { width: 78px; text-align: right; flex-shrink: 0; color: var(--text-primary);
+    font-variant-numeric: tabular-nums; }
+
+  .col-chart { display: flex; align-items: flex-end; gap: 10px; height: 160px; padding-top: 20px; }
+  .col-chart .col { flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: flex-end;
+    height: 100%; gap: 6px; }
+  .col-chart .col .cap-valor { font-size: 12px; font-variant-numeric: tabular-nums; color: var(--text-primary); }
+  .col-chart .col .barra { width: 60%; border-radius: 4px 4px 0 0; cursor: default; }
+  .col-chart .col .etiqueta { font-size: 11px; color: var(--text-secondary); text-align: center; }
+
+  table { width: 100%; border-collapse: collapse; font-size: 12.5px; }
+  th, td { text-align: left; padding: 7px 8px; border-bottom: 1px solid var(--gridline); }
+  th { color: var(--text-secondary); font-weight: 600; cursor: pointer; user-select: none; white-space: nowrap; }
+  th:hover { color: var(--text-primary); }
+  th .flecha { font-size: 10px; opacity: 0.6; }
+  td.num { text-align: right; font-variant-numeric: tabular-nums; }
+  td a { color: var(--series-1); text-decoration: none; }
+  td a:hover { text-decoration: underline; }
+  .tabla-wrap { max-height: 420px; overflow: auto; }
+
   .popup-aviso { font-size: 13px; line-height: 1.5; }
   .popup-aviso b { font-size: 14px; }
-  .info-header {
-    position: absolute; top: 10px; left: 50%; transform: translateX(-50%); z-index: 1000;
-    background: white; padding: 6px 16px; border-radius: 8px;
-    box-shadow: 0 1px 5px rgba(0,0,0,0.4); font-size: 13px;
-  }
 </style>
 </head>
 <body>
-<div id="mapa"></div>
-<div class="info-header">Radar de mercado inmobiliario · Córdoba · 9 avisos · generado 2026-09-18 11:25</div>
-<div class="leyenda" id="leyenda"></div>
+
+<header>
+  <h1>Radar de mercado inmobiliario · Córdoba</h1>
+  <p>9 avisos · generado 2026-09-18 11:50</p>
+</header>
+
+<div class="stats" id="stats"></div>
+
+<div class="filtros">
+  <div class="grupo" id="filtro-tipologia">
+    <strong>Tipología</strong>
+  </div>
+  <div class="grupo">
+    <strong>Precio USD</strong>
+    <input type="number" id="precio-min" placeholder="Mín">
+    <input type="number" id="precio-max" placeholder="Máx">
+  </div>
+  <div class="grupo">
+    <strong>Superficie m²</strong>
+    <input type="number" id="m2-min" placeholder="Mín">
+    <input type="number" id="m2-max" placeholder="Máx">
+  </div>
+  <button id="limpiar-filtros">Limpiar filtros</button>
+</div>
+
+<div class="grid-principal">
+  <div id="mapa"></div>
+  <div class="panel">
+    <h2>Precio/m² promedio por barrio (USD)</h2>
+    <p class="subtitulo">Top 12 barrios con más avisos con precio y m² cargados</p>
+    <div id="chart-barrios"></div>
+  </div>
+</div>
+
+<div class="grid-principal">
+  <div class="panel">
+    <h2>Avisos por tipología</h2>
+    <p class="subtitulo"></p>
+    <div class="col-chart" id="chart-tipologia"></div>
+  </div>
+  <div class="panel">
+    <h2>Ranking de barrios por precio/m²</h2>
+    <p class="subtitulo">Todos los barrios con datos de precio/m² (USD)</p>
+    <div class="tabla-wrap">
+      <table id="tabla-barrios">
+        <thead><tr>
+          <th data-col="barrio">Barrio</th>
+          <th data-col="cantidad" class="num">Avisos</th>
+          <th data-col="precio_m2" class="num">Precio/m² prom.</th>
+        </tr></thead>
+        <tbody></tbody>
+      </table>
+    </div>
+  </div>
+</div>
+
+<div class="panel">
+  <h2>Listado de avisos</h2>
+  <p class="subtitulo" id="contador-listado"></p>
+  <div class="tabla-wrap">
+    <table id="tabla-avisos">
+      <thead><tr>
+        <th data-col="tipologia">Tipología</th>
+        <th data-col="barrio">Barrio</th>
+        <th data-col="precio" class="num">Precio</th>
+        <th data-col="m2" class="num">m²</th>
+        <th data-col="precio_m2" class="num">Precio/m²</th>
+        <th data-col="fuente">Fuente</th>
+        <th>Aviso</th>
+      </tr></thead>
+      <tbody></tbody>
+    </table>
+  </div>
+</div>
 
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 <script>
 const AVISOS = [{"id": "argenprop-18484925", "titulo": "Terreno en venta en Colinas de Manantiales – 330 m² apto dúplex", "descripcion": "Oportunidad en colinas de manantiales: lote de 330 m2, con factibilidad para construir dúplex, entorno urbanizado, seguridad 24hs.", "precio": 60000, "moneda": "USD", "m2": 330, "direccion": "Colinas de Manantiales, Córdoba", "barrio": "Colinas de Manantiales", "tipologia": "terreno", "fuente": "argenprop", "url": "https://www.argenprop.com/terreno-en-venta-en-cordoba--18484925", "lat": -31.4791003, "lon": -64.2666594}, {"id": "argenprop-19877621", "titulo": "Terreno de 4.875 m² con potencial de desarrollo o galpón", "descripcion": "Terreno en venta de 4.875 m2 con gran potencial de desarrollo o galpon.", "precio": 129000, "moneda": "USD", "m2": 4875, "direccion": "Córdoba", "barrio": null, "tipologia": "terreno", "fuente": "argenprop", "url": "https://www.argenprop.com/terreno-en-venta-en-cordoba--19877621", "lat": -31.4166867, "lon": -64.1834193}, {"id": "argenprop-19782223", "titulo": "Terreno en Abras de Manantiales, zona de crecimiento", "descripcion": "Terreno en venta en abras de manantiales, excelente ubicación en zona de crecimiento.", "precio": 45000, "moneda": "USD", "m2": 270, "direccion": "Abras de Manantiales, Córdoba", "barrio": "Abras de Manantiales", "tipologia": "terreno", "fuente": "argenprop", "url": "https://www.argenprop.com/terreno-en-venta-en-cordoba--19782223", "lat": -31.4837515, "lon": -64.265197}, {"id": "argenprop-19782213", "titulo": "Terreno central apto dúplex con seguridad en Abras de Manantiales", "descripcion": "Terreno central apto dúplex con seguridad en Abras de Manantiales.", "precio": 63800, "moneda": "USD", "m2": 300, "direccion": "Abras de Manantiales, Córdoba", "barrio": "Abras de Manantiales", "tipologia": "duplex", "fuente": "argenprop", "url": "https://www.argenprop.com/terreno-en-venta-en-cordoba--19782213", "lat": -31.4837515, "lon": -64.265197}, {"id": "argenprop-16775986", "titulo": "Terreno comercial sobre Av. Donato Álvarez", "descripcion": "Ventas terrenos comercial avda. donato alvarez cordoba.", "precio": 40000, "moneda": "USD", "m2": 366, "direccion": "Donato Alvarez 8500, Cerro Norte", "barrio": "Cerro Norte", "tipologia": "terreno", "fuente": "argenprop", "url": "https://www.argenprop.com/terreno-en-venta-en-cerro-norte--16775986", "lat": -31.3176599, "lon": -64.2736661}, {"id": "zonaprop-55212128", "titulo": "Terreno en corredor Lucchese, Villa Allende", "descripcion": "Excelente Oportunidad Inmobiliaria. Terreno en inmejorable ubicacion, en corredor C1 Lucchese, sobre colectora.", "precio": 4111120, "moneda": "USD", "m2": 31624, "direccion": "Villa Allende, Córdoba", "barrio": "Villa Allende", "tipologia": "terreno", "fuente": "zonaprop", "url": "https://www.zonaprop.com.ar/propiedades/clasificado/vecltrin-terreno-en-corredor-lucchese-55212128.html", "lat": -31.2936231, "lon": -64.2976203}, {"id": "zonaprop-manual-lote-campos", "titulo": "Lote en Campos de Manantiales", "descripcion": "Lote Campos de Manantiales, 300 m² tot.", "precio": 48000, "moneda": "USD", "m2": 300, "direccion": "Campos de Manantiales, Córdoba", "barrio": "Campos de Manantiales", "tipologia": "lote", "fuente": "zonaprop", "url": null, "lat": -31.4903645, "lon": -64.277916}, {"id": "zonaprop-manual-campo-chico", "titulo": "Casa en Campo Chico, 180 m²", "descripcion": "Casa 4 amb, 3 dorm, 2 baños, 2 cocheras en Campo Chico Urbanización Residencial.", "precio": 279000, "moneda": "USD", "m2": 180, "direccion": "Campo Chico, Córdoba", "barrio": "Campo Chico", "tipologia": "casa", "fuente": "zonaprop", "url": null, "lat": -31.7256931, "lon": -64.4034293}, {"id": "zonaprop-manual-quebradas-duplex", "titulo": "Dúplex en Quebradas de Manantiales", "descripcion": "Dúplex en Quebradas de Manantiales, 67 m² cubiertos sobre terreno de 140 m², entrega junio 2026.", "precio": 124000, "moneda": "USD", "m2": 67, "direccion": "Quebradas de Manantiales, Córdoba", "barrio": "Manantiales II", "tipologia": "duplex", "fuente": "zonaprop", "url": null, "lat": -31.4695121, "lon": -64.2759419}];
-const COLORES = {"terreno": "#2563eb", "lote": "#0891b2", "casa": "#16a34a", "duplex": "#ea580c", "otro": "#6b7280"};
+const COLORES = {"terreno": {"light": "#2a78d6", "dark": "#3987e5"}, "duplex": {"light": "#eb6834", "dark": "#d95926"}, "lote": {"light": "#1baf7a", "dark": "#199e70"}, "casa": {"light": "#eda100", "dark": "#c98500"}, "otro": {"light": "#898781", "dark": "#898781"}};
+const ETIQUETAS = {"terreno": "Terreno", "casa": "Casa", "duplex": "Dúplex", "lote": "Lote/Loteo", "otro": "Otro"};
+const TIPOLOGIAS = Object.keys(ETIQUETAS).filter(function (t) { return t !== 'otro'; });
 
-const mapa = L.map('mapa').setView([-31.4201, -64.1888], 12);
-L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-  attribution: '&copy; OpenStreetMap contributors',
-  maxZoom: 19,
-}).addTo(mapa);
-
-function formatoARS(n) {
-  if (n == null) return '-';
+function esOscuro() {
+  return window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches
+    && document.documentElement.getAttribute('data-theme') !== 'light';
+}
+function colorTipologia(t) {
+  const c = COLORES[t] || COLORES['otro'];
+  return esOscuro() ? c.dark : c.light;
+}
+function fmt(n) {
+  if (n == null || isNaN(n)) return '-';
   return new Intl.NumberFormat('es-AR', { maximumFractionDigits: 0 }).format(n);
 }
+function precioM2(aviso) {
+  if (aviso.moneda !== 'USD' || aviso.precio == null || !aviso.m2) return null;
+  return aviso.precio / aviso.m2;
+}
 
-const gruposPorTipo = {};
-const tiposPresentes = new Set();
+// ---- estado de filtros ----
+const filtros = {
+  tipologias: new Set(TIPOLOGIAS),
+  precioMin: null, precioMax: null, m2Min: null, m2Max: null,
+};
 
-AVISOS.forEach(function (aviso) {
-  if (aviso.lat == null || aviso.lon == null) return;
-  const tipo = (aviso.tipologia || 'otro').toLowerCase();
-  tiposPresentes.add(tipo);
-  const color = COLORES[tipo] || COLORES['otro'];
-
-  const marker = L.circleMarker([aviso.lat, aviso.lon], {
-    radius: 7,
-    color: color,
-    fillColor: color,
-    fillOpacity: 0.75,
-    weight: 1,
+function avisosFiltrados() {
+  return AVISOS.filter(function (a) {
+    const tipo = (a.tipologia || 'otro');
+    if (!filtros.tipologias.has(tipo)) return false;
+    if (filtros.precioMin != null && (a.precio == null || a.precio < filtros.precioMin)) return false;
+    if (filtros.precioMax != null && (a.precio == null || a.precio > filtros.precioMax)) return false;
+    if (filtros.m2Min != null && (a.m2 == null || a.m2 < filtros.m2Min)) return false;
+    if (filtros.m2Max != null && (a.m2 == null || a.m2 > filtros.m2Max)) return false;
+    return true;
   });
+}
 
-  const precioM2 = aviso.precio_m2 != null
-    ? '$' + formatoARS(aviso.precio_m2) + '/m²'
-    : (aviso.precio && aviso.m2 ? '$' + formatoARS(aviso.precio / aviso.m2) + '/m²' : '-');
-
-  const popup = `
-    <div class="popup-aviso">
-      <b>${aviso.titulo || tipo}</b><br/>
-      ${aviso.barrio || aviso.direccion || ''}<br/>
-      Precio: $${formatoARS(aviso.precio)}<br/>
-      Superficie: ${aviso.m2 != null ? aviso.m2 + ' m²' : '-'}<br/>
-      Precio/m²: ${precioM2}<br/>
-      Fuente: ${aviso.fuente || '-'}<br/>
-      ${aviso.url ? `<a href="${aviso.url}" target="_blank" rel="noopener">Ver aviso original</a>` : ''}
-    </div>
-  `;
-  marker.bindPopup(popup);
-
-  if (!gruposPorTipo[tipo]) gruposPorTipo[tipo] = L.layerGroup();
-  gruposPorTipo[tipo].addLayer(marker);
+// ---- filtros: UI ----
+const filtroTipologiaEl = document.getElementById('filtro-tipologia');
+TIPOLOGIAS.forEach(function (t) {
+  const id = 'chk-' + t;
+  const label = document.createElement('label');
+  const chk = document.createElement('input');
+  chk.type = 'checkbox'; chk.id = id; chk.checked = true;
+  chk.addEventListener('change', function () {
+    if (chk.checked) filtros.tipologias.add(t); else filtros.tipologias.delete(t);
+    render();
+  });
+  const swatch = document.createElement('span');
+  swatch.className = 'swatch';
+  swatch.style.background = colorTipologia(t);
+  label.appendChild(chk);
+  label.appendChild(swatch);
+  label.appendChild(document.createTextNode(ETIQUETAS[t]));
+  filtroTipologiaEl.appendChild(label);
 });
 
-Object.values(gruposPorTipo).forEach(function (grupo) { grupo.addTo(mapa); });
-L.control.layers(null, gruposPorTipo, { collapsed: false }).addTo(mapa);
-
-const leyendaEl = document.getElementById('leyenda');
-const etiquetas = { terreno: 'Terreno', lote: 'Lote/Loteo', casa: 'Casa', duplex: 'Dúplex', otro: 'Otro' };
-let html = '<b>Tipología</b>';
-Array.from(tiposPresentes).sort().forEach(function (tipo) {
-  const color = COLORES[tipo] || COLORES['otro'];
-  html += `<div class="item"><span class="punto" style="background:${color}"></span>${etiquetas[tipo] || tipo}</div>`;
+['precio-min', 'precio-max', 'm2-min', 'm2-max'].forEach(function (id) {
+  document.getElementById(id).addEventListener('input', function (e) {
+    const v = e.target.value === '' ? null : Number(e.target.value);
+    if (id === 'precio-min') filtros.precioMin = v;
+    if (id === 'precio-max') filtros.precioMax = v;
+    if (id === 'm2-min') filtros.m2Min = v;
+    if (id === 'm2-max') filtros.m2Max = v;
+    render();
+  });
 });
-leyendaEl.innerHTML = html;
+
+document.getElementById('limpiar-filtros').addEventListener('click', function () {
+  filtros.tipologias = new Set(TIPOLOGIAS);
+  filtros.precioMin = filtros.precioMax = filtros.m2Min = filtros.m2Max = null;
+  TIPOLOGIAS.forEach(function (t) { document.getElementById('chk-' + t).checked = true; });
+  ['precio-min', 'precio-max', 'm2-min', 'm2-max'].forEach(function (id) { document.getElementById(id).value = ''; });
+  render();
+});
+
+// ---- mapa ----
+const mapa = L.map('mapa').setView([-31.4201, -64.1888], 12);
+L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+  attribution: '&copy; OpenStreetMap contributors', maxZoom: 19,
+}).addTo(mapa);
+let capaMarcadores = L.layerGroup().addTo(mapa);
+
+function renderMapa(avisos) {
+  capaMarcadores.clearLayers();
+  avisos.forEach(function (aviso) {
+    if (aviso.lat == null || aviso.lon == null) return;
+    const tipo = (aviso.tipologia || 'otro');
+    const color = colorTipologia(tipo);
+    const marker = L.circleMarker([aviso.lat, aviso.lon], {
+      radius: 7, color: color, fillColor: color, fillOpacity: 0.75, weight: 1,
+    });
+    const pm2 = precioM2(aviso);
+    const popup = document.createElement('div');
+    popup.className = 'popup-aviso';
+    function fila(texto) { const d = document.createElement('div'); d.textContent = texto; return d; }
+    const titulo = document.createElement('b'); titulo.textContent = aviso.titulo || tipo;
+    popup.appendChild(titulo);
+    popup.appendChild(fila(aviso.barrio || aviso.direccion || ''));
+    popup.appendChild(fila('Precio: ' + (aviso.moneda === 'USD' ? 'USD ' : '$') + fmt(aviso.precio)));
+    popup.appendChild(fila('Superficie: ' + (aviso.m2 != null ? fmt(aviso.m2) + ' m²' : '-')));
+    popup.appendChild(fila('Precio/m²: ' + (pm2 != null ? 'USD ' + fmt(pm2) : '-')));
+    popup.appendChild(fila('Fuente: ' + (aviso.fuente || '-')));
+    if (aviso.url) {
+      const a = document.createElement('a'); a.href = aviso.url; a.target = '_blank'; a.rel = 'noopener';
+      a.textContent = 'Ver aviso original';
+      popup.appendChild(a);
+    }
+    marker.bindPopup(popup);
+    capaMarcadores.addLayer(marker);
+  });
+}
+
+// ---- stat tiles ----
+function renderStats(avisos) {
+  const conPrecioM2 = avisos.map(precioM2).filter(function (v) { return v != null; });
+  const promedio = conPrecioM2.length ? conPrecioM2.reduce(function (a, b) { return a + b; }, 0) / conPrecioM2.length : null;
+  const barrios = new Set(avisos.map(function (a) { return a.barrio; }).filter(Boolean));
+  const tiles = [
+    { label: 'Avisos (filtro actual)', value: fmt(avisos.length) },
+    { label: 'Precio/m² promedio (USD)', value: promedio != null ? '$' + fmt(promedio) : '-' },
+    { label: 'Barrios cubiertos', value: fmt(barrios.size) },
+    { label: 'Total sin filtrar', value: fmt(AVISOS.length) },
+  ];
+  const el = document.getElementById('stats');
+  el.innerHTML = '';
+  tiles.forEach(function (t) {
+    const div = document.createElement('div'); div.className = 'stat-tile';
+    const l = document.createElement('div'); l.className = 'label'; l.textContent = t.label;
+    const v = document.createElement('div'); v.className = 'value'; v.textContent = t.value;
+    div.appendChild(l); div.appendChild(v);
+    el.appendChild(div);
+  });
+}
+
+// ---- gráfico: precio/m² por barrio (barras horizontales, top 12) ----
+function datosPorBarrio(avisos) {
+  const grupos = {};
+  avisos.forEach(function (a) {
+    const pm2 = precioM2(a);
+    if (pm2 == null || !a.barrio) return;
+    if (!grupos[a.barrio]) grupos[a.barrio] = [];
+    grupos[a.barrio].push(pm2);
+  });
+  return Object.keys(grupos).map(function (barrio) {
+    const valores = grupos[barrio];
+    const promedio = valores.reduce(function (a, b) { return a + b; }, 0) / valores.length;
+    return { barrio: barrio, cantidad: valores.length, precio_m2: promedio };
+  }).sort(function (a, b) { return b.precio_m2 - a.precio_m2; });
+}
+
+function renderChartBarrios(avisos) {
+  const datos = datosPorBarrio(avisos).slice(0, 12);
+  const el = document.getElementById('chart-barrios');
+  el.innerHTML = '';
+  if (!datos.length) { el.textContent = 'Sin datos de precio/m² para este filtro.'; return; }
+  const max = Math.max.apply(null, datos.map(function (d) { return d.precio_m2; }));
+  datos.forEach(function (d) {
+    const fila = document.createElement('div'); fila.className = 'barra-fila';
+    const nombre = document.createElement('div'); nombre.className = 'nombre'; nombre.textContent = d.barrio;
+    const pista = document.createElement('div'); pista.className = 'pista';
+    const barra = document.createElement('div'); barra.className = 'barra';
+    barra.style.width = Math.max(2, (d.precio_m2 / max) * 100) + '%';
+    barra.style.background = 'var(--series-1)';
+    barra.title = d.barrio + ': $' + fmt(d.precio_m2) + '/m² (' + d.cantidad + ' avisos)';
+    pista.appendChild(barra);
+    const valor = document.createElement('div'); valor.className = 'valor'; valor.textContent = '$' + fmt(d.precio_m2);
+    fila.appendChild(nombre); fila.appendChild(pista); fila.appendChild(valor);
+    el.appendChild(fila);
+  });
+}
+
+// ---- gráfico: cantidad por tipología (columnas) ----
+function renderChartTipologia(avisos) {
+  const conteos = {};
+  TIPOLOGIAS.forEach(function (t) { conteos[t] = 0; });
+  avisos.forEach(function (a) { const t = a.tipologia || 'otro'; if (conteos[t] != null) conteos[t]++; });
+  const max = Math.max.apply(null, Object.values(conteos).concat([1]));
+  const el = document.getElementById('chart-tipologia');
+  el.innerHTML = '';
+  TIPOLOGIAS.forEach(function (t) {
+    const col = document.createElement('div'); col.className = 'col';
+    const capValor = document.createElement('div'); capValor.className = 'cap-valor'; capValor.textContent = fmt(conteos[t]);
+    const barra = document.createElement('div'); barra.className = 'barra';
+    barra.style.height = Math.max(2, (conteos[t] / max) * 100) + '%';
+    barra.style.background = colorTipologia(t);
+    barra.title = ETIQUETAS[t] + ': ' + conteos[t] + ' avisos';
+    const etiqueta = document.createElement('div'); etiqueta.className = 'etiqueta'; etiqueta.textContent = ETIQUETAS[t];
+    col.appendChild(capValor); col.appendChild(barra); col.appendChild(etiqueta);
+    el.appendChild(col);
+  });
+}
+
+// ---- tabla: ranking de barrios ----
+let ordenBarrios = { col: 'precio_m2', asc: false };
+function renderTablaBarrios(avisos) {
+  let datos = datosPorBarrio(avisos);
+  datos = ordenarPor(datos, ordenBarrios);
+  const tbody = document.querySelector('#tabla-barrios tbody');
+  tbody.innerHTML = '';
+  datos.forEach(function (d) {
+    const tr = document.createElement('tr');
+    const tdB = document.createElement('td'); tdB.textContent = d.barrio;
+    const tdC = document.createElement('td'); tdC.className = 'num'; tdC.textContent = fmt(d.cantidad);
+    const tdP = document.createElement('td'); tdP.className = 'num'; tdP.textContent = '$' + fmt(d.precio_m2);
+    tr.appendChild(tdB); tr.appendChild(tdC); tr.appendChild(tdP);
+    tbody.appendChild(tr);
+  });
+}
+
+// ---- tabla: listado de avisos ----
+let ordenAvisos = { col: 'precio_m2', asc: false };
+function renderTablaAvisos(avisos) {
+  const enriquecidos = avisos.map(function (a) { return Object.assign({}, a, { precio_m2: precioM2(a) }); });
+  const ordenados = ordenarPor(enriquecidos, ordenAvisos);
+  const tbody = document.querySelector('#tabla-avisos tbody');
+  tbody.innerHTML = '';
+  ordenados.forEach(function (a) {
+    const tr = document.createElement('tr');
+    function celda(texto, num) {
+      const td = document.createElement('td'); if (num) td.className = 'num'; td.textContent = texto; return td;
+    }
+    tr.appendChild(celda(ETIQUETAS[a.tipologia || 'otro']));
+    tr.appendChild(celda(a.barrio || a.direccion || '-'));
+    tr.appendChild(celda((a.moneda === 'USD' ? 'USD ' : '$') + fmt(a.precio), true));
+    tr.appendChild(celda(a.m2 != null ? fmt(a.m2) : '-', true));
+    tr.appendChild(celda(a.precio_m2 != null ? '$' + fmt(a.precio_m2) : '-', true));
+    tr.appendChild(celda(a.fuente || '-'));
+    const tdLink = document.createElement('td');
+    if (a.url) {
+      const link = document.createElement('a'); link.href = a.url; link.target = '_blank'; link.rel = 'noopener';
+      link.textContent = 'Ver'; tdLink.appendChild(link);
+    } else { tdLink.textContent = '-'; }
+    tr.appendChild(tdLink);
+    tbody.appendChild(tr);
+  });
+  document.getElementById('contador-listado').textContent = ordenados.length + ' avisos';
+}
+
+function ordenarPor(arr, orden) {
+  const copia = arr.slice();
+  copia.sort(function (a, b) {
+    let va = a[orden.col], vb = b[orden.col];
+    if (va == null) va = orden.asc ? Infinity : -Infinity;
+    if (vb == null) vb = orden.asc ? Infinity : -Infinity;
+    if (typeof va === 'string') return orden.asc ? va.localeCompare(vb) : vb.localeCompare(va);
+    return orden.asc ? va - vb : vb - va;
+  });
+  return copia;
+}
+
+function activarOrdenTabla(tablaId, estado, rerender) {
+  document.querySelectorAll('#' + tablaId + ' th[data-col]').forEach(function (th) {
+    th.addEventListener('click', function () {
+      const col = th.getAttribute('data-col');
+      if (estado.col === col) estado.asc = !estado.asc; else { estado.col = col; estado.asc = false; }
+      rerender();
+    });
+  });
+}
+activarOrdenTabla('tabla-barrios', ordenBarrios, function () { render(); });
+activarOrdenTabla('tabla-avisos', ordenAvisos, function () { render(); });
+
+function render() {
+  const avisos = avisosFiltrados();
+  renderStats(avisos);
+  renderMapa(avisos);
+  renderChartBarrios(avisos);
+  renderChartTipologia(avisos);
+  renderTablaBarrios(avisos);
+  renderTablaAvisos(avisos);
+}
+
+render();
 </script>
 </body>
 </html>
