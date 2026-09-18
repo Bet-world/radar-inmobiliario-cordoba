@@ -1,0 +1,100 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="utf-8" />
+<title>Radar de mercado inmobiliario - Córdoba</title>
+<meta name="robots" content="noindex, nofollow" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+<style>
+  html, body { height: 100%; margin: 0; font-family: -apple-system, Helvetica, Arial, sans-serif; }
+  #mapa { height: 100%; width: 100%; }
+  .leyenda {
+    position: absolute; bottom: 20px; left: 10px; z-index: 1000;
+    background: white; padding: 10px 14px; border-radius: 8px;
+    box-shadow: 0 1px 5px rgba(0,0,0,0.4); font-size: 13px; line-height: 1.6;
+  }
+  .leyenda .item { display: flex; align-items: center; gap: 6px; }
+  .leyenda .punto { width: 12px; height: 12px; border-radius: 50%; display: inline-block; }
+  .popup-aviso { font-size: 13px; line-height: 1.5; }
+  .popup-aviso b { font-size: 14px; }
+  .info-header {
+    position: absolute; top: 10px; left: 50%; transform: translateX(-50%); z-index: 1000;
+    background: white; padding: 6px 16px; border-radius: 8px;
+    box-shadow: 0 1px 5px rgba(0,0,0,0.4); font-size: 13px;
+  }
+</style>
+</head>
+<body>
+<div id="mapa"></div>
+<div class="info-header">Radar de mercado inmobiliario · Córdoba · 9 avisos · generado 2026-09-18 11:25</div>
+<div class="leyenda" id="leyenda"></div>
+
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script>
+const AVISOS = [{"id": "argenprop-18484925", "titulo": "Terreno en venta en Colinas de Manantiales – 330 m² apto dúplex", "descripcion": "Oportunidad en colinas de manantiales: lote de 330 m2, con factibilidad para construir dúplex, entorno urbanizado, seguridad 24hs.", "precio": 60000, "moneda": "USD", "m2": 330, "direccion": "Colinas de Manantiales, Córdoba", "barrio": "Colinas de Manantiales", "tipologia": "terreno", "fuente": "argenprop", "url": "https://www.argenprop.com/terreno-en-venta-en-cordoba--18484925", "lat": -31.4791003, "lon": -64.2666594}, {"id": "argenprop-19877621", "titulo": "Terreno de 4.875 m² con potencial de desarrollo o galpón", "descripcion": "Terreno en venta de 4.875 m2 con gran potencial de desarrollo o galpon.", "precio": 129000, "moneda": "USD", "m2": 4875, "direccion": "Córdoba", "barrio": null, "tipologia": "terreno", "fuente": "argenprop", "url": "https://www.argenprop.com/terreno-en-venta-en-cordoba--19877621", "lat": -31.4166867, "lon": -64.1834193}, {"id": "argenprop-19782223", "titulo": "Terreno en Abras de Manantiales, zona de crecimiento", "descripcion": "Terreno en venta en abras de manantiales, excelente ubicación en zona de crecimiento.", "precio": 45000, "moneda": "USD", "m2": 270, "direccion": "Abras de Manantiales, Córdoba", "barrio": "Abras de Manantiales", "tipologia": "terreno", "fuente": "argenprop", "url": "https://www.argenprop.com/terreno-en-venta-en-cordoba--19782223", "lat": -31.4837515, "lon": -64.265197}, {"id": "argenprop-19782213", "titulo": "Terreno central apto dúplex con seguridad en Abras de Manantiales", "descripcion": "Terreno central apto dúplex con seguridad en Abras de Manantiales.", "precio": 63800, "moneda": "USD", "m2": 300, "direccion": "Abras de Manantiales, Córdoba", "barrio": "Abras de Manantiales", "tipologia": "duplex", "fuente": "argenprop", "url": "https://www.argenprop.com/terreno-en-venta-en-cordoba--19782213", "lat": -31.4837515, "lon": -64.265197}, {"id": "argenprop-16775986", "titulo": "Terreno comercial sobre Av. Donato Álvarez", "descripcion": "Ventas terrenos comercial avda. donato alvarez cordoba.", "precio": 40000, "moneda": "USD", "m2": 366, "direccion": "Donato Alvarez 8500, Cerro Norte", "barrio": "Cerro Norte", "tipologia": "terreno", "fuente": "argenprop", "url": "https://www.argenprop.com/terreno-en-venta-en-cerro-norte--16775986", "lat": -31.3176599, "lon": -64.2736661}, {"id": "zonaprop-55212128", "titulo": "Terreno en corredor Lucchese, Villa Allende", "descripcion": "Excelente Oportunidad Inmobiliaria. Terreno en inmejorable ubicacion, en corredor C1 Lucchese, sobre colectora.", "precio": 4111120, "moneda": "USD", "m2": 31624, "direccion": "Villa Allende, Córdoba", "barrio": "Villa Allende", "tipologia": "terreno", "fuente": "zonaprop", "url": "https://www.zonaprop.com.ar/propiedades/clasificado/vecltrin-terreno-en-corredor-lucchese-55212128.html", "lat": -31.2936231, "lon": -64.2976203}, {"id": "zonaprop-manual-lote-campos", "titulo": "Lote en Campos de Manantiales", "descripcion": "Lote Campos de Manantiales, 300 m² tot.", "precio": 48000, "moneda": "USD", "m2": 300, "direccion": "Campos de Manantiales, Córdoba", "barrio": "Campos de Manantiales", "tipologia": "lote", "fuente": "zonaprop", "url": null, "lat": -31.4903645, "lon": -64.277916}, {"id": "zonaprop-manual-campo-chico", "titulo": "Casa en Campo Chico, 180 m²", "descripcion": "Casa 4 amb, 3 dorm, 2 baños, 2 cocheras en Campo Chico Urbanización Residencial.", "precio": 279000, "moneda": "USD", "m2": 180, "direccion": "Campo Chico, Córdoba", "barrio": "Campo Chico", "tipologia": "casa", "fuente": "zonaprop", "url": null, "lat": -31.7256931, "lon": -64.4034293}, {"id": "zonaprop-manual-quebradas-duplex", "titulo": "Dúplex en Quebradas de Manantiales", "descripcion": "Dúplex en Quebradas de Manantiales, 67 m² cubiertos sobre terreno de 140 m², entrega junio 2026.", "precio": 124000, "moneda": "USD", "m2": 67, "direccion": "Quebradas de Manantiales, Córdoba", "barrio": "Manantiales II", "tipologia": "duplex", "fuente": "zonaprop", "url": null, "lat": -31.4695121, "lon": -64.2759419}];
+const COLORES = {"terreno": "#2563eb", "lote": "#0891b2", "casa": "#16a34a", "duplex": "#ea580c", "otro": "#6b7280"};
+
+const mapa = L.map('mapa').setView([-31.4201, -64.1888], 12);
+L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+  attribution: '&copy; OpenStreetMap contributors',
+  maxZoom: 19,
+}).addTo(mapa);
+
+function formatoARS(n) {
+  if (n == null) return '-';
+  return new Intl.NumberFormat('es-AR', { maximumFractionDigits: 0 }).format(n);
+}
+
+const gruposPorTipo = {};
+const tiposPresentes = new Set();
+
+AVISOS.forEach(function (aviso) {
+  if (aviso.lat == null || aviso.lon == null) return;
+  const tipo = (aviso.tipologia || 'otro').toLowerCase();
+  tiposPresentes.add(tipo);
+  const color = COLORES[tipo] || COLORES['otro'];
+
+  const marker = L.circleMarker([aviso.lat, aviso.lon], {
+    radius: 7,
+    color: color,
+    fillColor: color,
+    fillOpacity: 0.75,
+    weight: 1,
+  });
+
+  const precioM2 = aviso.precio_m2 != null
+    ? '$' + formatoARS(aviso.precio_m2) + '/m²'
+    : (aviso.precio && aviso.m2 ? '$' + formatoARS(aviso.precio / aviso.m2) + '/m²' : '-');
+
+  const popup = `
+    <div class="popup-aviso">
+      <b>${aviso.titulo || tipo}</b><br/>
+      ${aviso.barrio || aviso.direccion || ''}<br/>
+      Precio: $${formatoARS(aviso.precio)}<br/>
+      Superficie: ${aviso.m2 != null ? aviso.m2 + ' m²' : '-'}<br/>
+      Precio/m²: ${precioM2}<br/>
+      Fuente: ${aviso.fuente || '-'}<br/>
+      ${aviso.url ? `<a href="${aviso.url}" target="_blank" rel="noopener">Ver aviso original</a>` : ''}
+    </div>
+  `;
+  marker.bindPopup(popup);
+
+  if (!gruposPorTipo[tipo]) gruposPorTipo[tipo] = L.layerGroup();
+  gruposPorTipo[tipo].addLayer(marker);
+});
+
+Object.values(gruposPorTipo).forEach(function (grupo) { grupo.addTo(mapa); });
+L.control.layers(null, gruposPorTipo, { collapsed: false }).addTo(mapa);
+
+const leyendaEl = document.getElementById('leyenda');
+const etiquetas = { terreno: 'Terreno', lote: 'Lote/Loteo', casa: 'Casa', duplex: 'Dúplex', otro: 'Otro' };
+let html = '<b>Tipología</b>';
+Array.from(tiposPresentes).sort().forEach(function (tipo) {
+  const color = COLORES[tipo] || COLORES['otro'];
+  html += `<div class="item"><span class="punto" style="background:${color}"></span>${etiquetas[tipo] || tipo}</div>`;
+});
+leyendaEl.innerHTML = html;
+</script>
+</body>
+</html>
